@@ -1,7 +1,12 @@
+# -*- coding: utf-8; -*-
 import os.path
 import openpyxl as px
 import pandas as pd
+import csv
 import matplotlib.pyplot as plt
+from typing import List, Dict, Tuple
+
+from Common.DB.sql import *
 
 
 class Util:
@@ -38,3 +43,39 @@ class Util:
             X = X.values
             y = y.values
         return X, y
+
+    def extract_tgt_itm_info(self, sql_cli, item_cd_li, floor_date='2018/7/18', upper_date='2018/7/19',
+                             does_output=False, dir=None, file_name=None) -> pd.DataFrame:
+        item_cd = ','.join(["\'" + str(i) + "\'" for i in item_cd_li])
+        sql = SQL_DICT['select_item_info'].format(item_cd=item_cd, floor_date=floor_date, upper_date=upper_date)
+        df = pd.read_sql(sql, sql_cli.conn
+                         # , index_col='HIRE_DATE'
+                         # , parse_dates='HIRE_DATE'
+                         )
+        if does_output:
+            self.df_to_csv(df, dir, file_name)
+        return df
+
+    def extract_tgt_ec_data(self, sql_cli, item_cd_li, logistics_cd_li, floor_date='2018/6/1', upper_date='2018/8/31',
+                            does_output=False, dir=None, file_name=None) -> pd.DataFrame:
+        logistics_cd = ','.join(["\'" + str(i) + "\'" for i in logistics_cd_li])
+        item_cd = ','.join(["\'" + str(i) + "\'" for i in item_cd_li])
+        sql = SQL_DICT['select_ec_trun_data'].format(item_cd=item_cd, logistics_cd=logistics_cd,
+                                                     floor_date=floor_date, upper_date=upper_date)
+        df = pd.read_sql(sql, sql_cli.conn
+                         # , index_col='HIRE_DATE'
+                         # , parse_dates='HIRE_DATE'
+                         )
+        if does_output:
+            self.df_to_csv(df, dir, file_name)
+        return df
+
+    @staticmethod
+    def csv_to_list(file_path):
+        data = []
+        with open(file_path, "r", encoding='utf-8') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                data.append(row)
+
+        return data

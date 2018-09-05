@@ -6,7 +6,7 @@ import datetime
 from sklearn import linear_model
 import matplotlib.pyplot as plt
 from sklearn import model_selection
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScale
 from sklearn.metrics import mean_squared_error
 from keras.models import Sequential
 from keras.layers import Dense

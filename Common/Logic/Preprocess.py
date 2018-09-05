@@ -286,3 +286,4 @@ class MergeMasterTable:
         df_calender['日付'] = pd.to_datetime(df_calender['日付'], errors='coerce')
         df_calender['翌日が休日'] = df_calender.apply(lambda x: 1 if x['翌日が休日'] > 0 else 0, axis=1)
         return pd.merge(df_src, df_calender, left_on='H.集計対象営業年月日', right_on='日付').drop('日付', axis=1)
+

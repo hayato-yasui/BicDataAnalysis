@@ -1,4 +1,4 @@
-# import pyodbc
+import pyodbc
 from contextlib import contextmanager
 
 import dataset
@@ -9,34 +9,28 @@ from config.config import DBConfig
 
 class SQLServerClient:
     def __init__(self):
-        self.__database: dataset.Database = None
         self.config = DBConfig()
-        self._connect()
+        self.conn = self._connect()
+        self.cur = self.conn.cursor()
 
     def _connect(self):
-        self.default_schema = self.config['PG_MAIN_SCHEMA']
+        self.default_schema = self.config.PG_MAIN_SCHEMA
         try:
-            self.__database = dataset.connect(
-                "postgresql://{user}:{password}@{host}:{port}/{dbname}".format(
-                    host=self.config['PG_HOST'],
-                    user=self.config['PG_MAIN_USER'],
-                    password=self.config['PG_MAIN_PASS'],
-                    dbname=self.config['PG_DB'],
-                    port=self.config['PG_PORT']),
-                schema=self.default_schema)
+            return pyodbc.connect(
+                r'DRIVER='+self.config.DRIVER + ';'
+                r'SERVER='+self.config.PG_HOST+';'
+                r'DATABASE='+self.config.PG_DB+';'
+                r'UID='+self.config.PG_MAIN_USER+';'
+                r'PWD='+self.config.PG_MAIN_PASS+';'
+                # r'MARS_Connection= yes'
+            )
+
         except Exception as e:
             raise e
-            # conn = pyodbc.connect(
-            #     r'DRIVER={ODBC Driver 13 for SQL Server};'
-            #     r'SERVER=52.193.7.124;'
-            #     r'DATABASE=;'
-            #     r'UID=sa;'
-            #     r'PWD=U8YQSiDGsd'
-            # )
 
     def execute_sql(self, query):
         try:
-            result = self.__database.query(query)
+            result = self.cur.execute(query)
             return result
         except Exception as e:
             raise e
@@ -80,22 +74,22 @@ class SQLServerClient:
             self.__database.schema = schema
         return self.__database.load_table(table_name).columns
 
-    def get_col_def(self, table_name, verbose=False, schema=None):
-        if schema is None:
-            schema = self.default_schema
-
-        if verbose:
-            selection = 'column_name, ordinal_position, data_type, is_nullable'
-        else:
-            selection = '*'
-
-        qstr = f"select {selection} " \
-               f"from information_schema.columns " \
-               f"where table_schema='{schema}' and " \
-               f"table_name='{table_name}'" \
-               f"order by ordinal_position;\n"
-
-        return self.execute_sql(qstr).next()
+    # def get_col_def(self, table_name, verbose=False, schema=None):
+    #     if schema is None:
+    #         schema = self.default_schema
+    #
+    #     if verbose:
+    #         selection = 'column_name, ordinal_position, data_type, is_nullable'
+    #     else:
+    #         selection = '*'
+    #
+    #     qstr = f"select {selection} " \
+    #            f"from information_schema.columns " \
+    #            f"where table_schema='{schema}' and " \
+    #            f"table_name='{table_name}'" \
+    #            f"order by ordinal_position;\n"
+    #
+    #     return self.execute_sql(qstr).next()
 
     @contextmanager
     def transaction(self):

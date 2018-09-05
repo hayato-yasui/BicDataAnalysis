@@ -122,7 +122,6 @@ class MultipleRegressionAnalysis:
         self.chart_cli.plotfig()
 
 
-
 if __name__ == '__main__':
     mra = MultipleRegressionAnalysis()
     mra.execute()
