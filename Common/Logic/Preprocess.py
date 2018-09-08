@@ -287,3 +287,7 @@ class MergeMasterTable:
         df_calender['翌日が休日'] = df_calender.apply(lambda x: 1 if x['翌日が休日'] > 0 else 0, axis=1)
         return pd.merge(df_src, df_calender, left_on='H.集計対象営業年月日', right_on='日付').drop('日付', axis=1)
 
+    def merge_chanel(self, df_src, file_path):
+        df_chanel = pd.read_csv(file_path, encoding='cp932', engine='python')
+        df_chanel['店舗コード'] = df_chanel['店舗コード'].astype(str).str.zfill(3)
+        return pd.merge(df_src, df_chanel, how='inner', on='店舗コード')

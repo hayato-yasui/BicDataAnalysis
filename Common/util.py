@@ -79,3 +79,17 @@ class Util:
                 data.append(row)
 
         return data
+
+    def select_ec_total_sales_by_chanel(self, sql_cli, floor_date='2018/7/1', upper_date='2018/7/31',
+                                        does_output=False, dir=None, file_name=None) -> pd.DataFrame:
+        sql = SQL_DICT['select_ec_total_sales_by_chanel'].format(floor_date=floor_date, upper_date=upper_date)
+        df = pd.read_sql(sql, sql_cli.conn
+                         # , index_col='HIRE_DATE'
+                         # , parse_dates='HIRE_DATE'
+                         )
+        if does_output:
+            self.df_to_csv(df, dir, file_name)
+        return df
+
+
+

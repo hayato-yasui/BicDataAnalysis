@@ -49,6 +49,10 @@ class MergeMasterTableSetting(object):
     # calender maseter
     F_PATH_CALENDER = './data/Input/master/calender/calender.csv'
 
+    # chanel maseter
+    F_PATH_CHANEL = './data/Input/master/chanel/chanel.csv'
+
+
 class ColumnGroup(object):
     ITEM = ['']
     STORE = []
