@@ -5,7 +5,7 @@ import numpy as np
 import datetime
 
 from Common.Setting.Common.PreprocessSetting import *
-
+from Common.DB.sql import *
 
 class Preprocess:
     def __init__(self):
@@ -253,6 +253,26 @@ class Preprocess:
                 curr_time_plus30)] = df['H.客数（合計）']
             curr_time = curr_time_plus30
         return df
+
+    @staticmethod
+    def adjust_0_filled(df):
+        for c in df.columns.values:
+            if c == 'item_cd':
+                df[c] = df[c].astype(str).str.zfill(13)
+            elif c == 'store_cd':
+                df[c] = df[c].astype(str).str.zfill(3)
+            elif c == 'distro_cd':
+                df[c] = df[c].astype(str).str.zfill(3)
+            elif c == 'supplier_cd':
+                df[c] = df[c].astype(str).str.zfill(5)
+        return df
+
+    @staticmethod
+    def fetch_item_info(sql_cli,store_cd, item_cd, floor_date,upper_date):
+        sql_li = [SQL_DICT['select_supplier_cd'].format(store_cd=store_cd,item_cd=item_cd, tgt_date=floor_date + datetime.timedelta(i)) for i
+                  in range((upper_date - floor_date).days + 1)]
+        sql = 'union all '.join(sql_li)
+        return pd.read_sql(sql, sql_cli.conn)
 
 
 class MergeMasterTable:
