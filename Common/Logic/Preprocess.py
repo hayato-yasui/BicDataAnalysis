@@ -274,6 +274,12 @@ class Preprocess:
         sql = 'union all '.join(sql_li)
         return pd.read_sql(sql, sql_cli.conn)
 
+    @staticmethod
+    def fetch_supplier_special_holiday(sql_cli,store_cd, item_cd, floor_date,upper_date):
+        sql_li = [SQL_DICT['select_supplier_cd'].format(store_cd=store_cd,item_cd=item_cd, tgt_date=floor_date + datetime.timedelta(i)) for i
+                  in range((upper_date - floor_date).days + 1)]
+        sql = 'union all '.join(sql_li)
+        return pd.read_sql(sql, sql_cli.conn)
 
 class MergeMasterTable:
     def __init__(self):

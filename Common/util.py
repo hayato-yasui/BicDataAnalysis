@@ -3,6 +3,7 @@ import os.path
 import openpyxl as px
 import pandas as pd
 import csv
+import datetime
 import matplotlib.pyplot as plt
 from typing import List, Dict, Tuple
 
@@ -44,10 +45,10 @@ class Util:
             y = y.values
         return X, y
 
-    def extract_tgt_itm_info(self, sql_cli, item_cd_li, floor_date='2018/7/18', upper_date='2018/7/19',
-                             does_output=False, dir=None, file_name=None) -> pd.DataFrame:
+    def extract_tgt_itm_info(self, sql_cli, item_cd_li, tgt_date='2018/7/31', does_output=False, dir=None,
+                             file_name=None) -> pd.DataFrame:
         item_cd = ','.join(["\'" + str(i) + "\'" for i in item_cd_li])
-        sql = SQL_DICT['select_item_info'].format(item_cd=item_cd, floor_date=floor_date, upper_date=upper_date)
+        sql = SQL_DICT['select_item_info'].format(item_cd=item_cd, tgt_date=tgt_date)
         df = pd.read_sql(sql, sql_cli.conn
                          # , index_col='HIRE_DATE'
                          # , parse_dates='HIRE_DATE'
@@ -91,5 +92,74 @@ class Util:
             self.df_to_csv(df, dir, file_name)
         return df
 
+    def select_ec_sales_amount(self, sql_cli, item_cd_li, floor_date='2018/7/1', upper_date='2018/7/31',
+                               does_output=False, dir=None, file_name=None,need_by_chanel=False) -> pd.DataFrame:
+        item_cd = ','.join(["\'" + str(i) + "\'" for i in item_cd_li])
+        sql = SQL_DICT['select_ec_sales_amount'].format(item_cd=item_cd, floor_date=floor_date, upper_date=upper_date)
+        df = pd.read_sql(sql, sql_cli.conn)
+        if need_by_chanel:
+            sql = SQL_DICT['select_ec_sales_amount_by_chanel'].format(item_cd=item_cd, floor_date=floor_date,
+                                                            upper_date=upper_date)
+            df_by_chanel = pd.read_sql(sql, sql_cli.conn)
+            df = pd.merge(df,df_by_chanel)
+        if does_output:
+            self.df_to_csv(df, dir, file_name)
+        return df
 
+    @staticmethod
+    def select_jan_num_by_dept(sql_cli, floor_date='2018-7-1', upper_date='2018-7-31') -> pd.DataFrame:
+        sql = SQL_DICT['select_jan_num_by_dept'].format(floor_date=floor_date, upper_date=upper_date)
+        return pd.read_sql(sql, sql_cli.conn)
 
+    @staticmethod
+    def select_shortage_by_item(sql_cli, store_cd, dept_cd, floor_date=datetime.date(2018, 7, 1),
+                                upper_date=datetime.date(2018, 7, 31)) -> pd.DataFrame:
+        tgt_date_li = ['\'' + str(floor_date + datetime.timedelta(i)) + '\'' for i in
+                       range((upper_date - floor_date).days + 1)]
+        tgt_date = ','.join(tgt_date_li)
+        sql = SQL_DICT['select_shortage_day_count'].format(store_cd=store_cd, dept_cd=dept_cd, tgt_date=tgt_date,
+                                                           upper_date=upper_date)
+        return pd.read_sql(sql, sql_cli.conn)
+
+    @staticmethod
+    def select_auto_ord_start_date(sql_cli, store_cd, item_cd_li, tgt_date='2018-7-31') -> pd.DataFrame:
+        item_cd = ','.join(["\'" + str(i) + "\'" for i in item_cd_li])
+        sql = SQL_DICT['select_auto_order_start_end_date'].format(store_cd=store_cd, item_cd=item_cd, tgt_date=tgt_date)
+        return pd.read_sql(sql, sql_cli.conn)
+
+    @staticmethod
+    def select_sales_amount_by_item(sql_cli, store_cd, item_cd, floor_date=datetime.date(2018, 7, 1),
+                                    upper_date=datetime.date(2018, 7, 31)) -> pd.DataFrame:
+        sql_li = [SQL_DICT['select_sales_amount_by_item'].format(store_cd=store_cd, item_cd=item_cd,
+                                                                 tgt_date=floor_date + datetime.timedelta(i)) for i in
+                  range((upper_date - floor_date).days + 1)]
+        sql = 'union all'.join(sql_li)
+        df_sales = pd.read_sql(sql, sql_cli.conn)
+
+        for i in range((upper_date - floor_date).days + 1):
+            if len(df_sales[df_sales["日付"].astype(str) == str(floor_date + datetime.timedelta(i))]) == 0:
+                df_no_sales = pd.DataFrame([(floor_date + datetime.timedelta(i), store_cd, item_cd, 0)],
+                                           columns=['日付', 'store_cd', 'item_cd', '販売数'])
+                df_sales = pd.concat([df_sales, df_no_sales])
+            df_sales['日付'] = pd.to_datetime(df_sales.日付)
+        return df_sales.sort_values("日付")
+
+    @staticmethod
+    def select_inv_by_item(sql_cli, store_cd, item_cd, floor_date=datetime.date(2018, 7, 1),
+                           upper_date=datetime.date(2018, 7, 31)) -> pd.DataFrame:
+        # tgt_date_li = ['\'' + str(floor_date + datetime.timedelta(i)) + '\'' for i in
+        #                range((upper_date - floor_date).days + 1)]
+        # tgt_date = ','.join(tgt_date_li)
+        # sql = SQL_DICT['select_inv_by_item'].format(store_cd=store_cd, item_cd=item_cd, tgt_date=tgt_date)
+
+        sql_li = [SQL_DICT['select_inv_by_item'].format(store_cd=store_cd, item_cd=item_cd,
+                                                        tgt_date=floor_date + datetime.timedelta(i)) for i in
+                  range((upper_date - floor_date).days + 1)]
+        sql = "union all".join(sql_li)
+        return pd.read_sql(sql, sql_cli.conn)
+
+    @staticmethod
+    def select_all_item_using_dept(sql_cli, store_cd, dept_cd_li, tgt_date='2018-7-31') -> pd.DataFrame:
+        dept_cd = ','.join(["\'" + str(d) + "\'" for d in dept_cd_li])
+        sql = SQL_DICT['select_all_item_using_dept'].format(store_cd=store_cd, dept_cd=dept_cd, tgt_date=tgt_date)
+        return pd.read_sql(sql, sql_cli.conn)

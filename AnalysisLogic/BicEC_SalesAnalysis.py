@@ -31,12 +31,18 @@ class BicECSalesAnalysis:
     def extract_sales_qty_by_chanel(self):
         df_sales_by_chanel = self.util.select_ec_total_sales_by_chanel(self.sql_cli, does_output=True,
                                                                        dir=self.bsa_s.OUTPUT_DIR,
-                                                                       file_name='チェネル別部門別売上金額_縦持.csv')
+                                                                       file_name='チャネル別部門別売上金額_縦持.csv')
         df_sales_by_chanel = self.mmt.merge_chanel(df_sales_by_chanel, self.mmt_s.F_PATH_CHANEL)
 
-        # 0以下をNullとする
+        # 0.49以下をNullとする
         for c in ['売上金額', '販売数']:
             df_sales_by_chanel[c] = df_sales_by_chanel.apply(lambda x: None if x[c] <= 0.49 else x[c], axis=1)
+
+        # # チャネルGP別にも算出
+        # chanel_gp_li = ['自社EC', 'Amazon', '楽天', 'Yahoo!', 'Wowma!', 'デジタルコレクション']
+        # for chanel_gp in chanel_gp_li:
+        #     for c in ['売上金額', '販売数']:
+        #         df_sales_by_chanel[]
 
         df_sales_by_dept = df_sales_by_chanel.groupby('部門コード')['売上金額', '販売数'].sum().reset_index()
         df_sales_by_dept.rename(columns={'売上金額': '売上金額_sum', '販売数': '販売数_sum'}, inplace=True)
@@ -64,30 +70,16 @@ class BicECSalesAnalysis:
             df_sales_qty_pivot_by_chanel[c + '_販売比率'] = df_sales_qty_pivot_by_chanel.apply(
                 lambda x: None if x[c + '_販売比率'] <= 0 else x[c + '_販売比率'], axis=1)
 
-        # columns_li_amount = []
-        # for c in list(df_sales_pivot_by_chanel.columns.values):
-        #     if c.count("_売上比率"):
-        #         continue
-        #     columns_li_amount.append(c)
-        #     if c in self.chanel_li:
-        #         columns_li_amount.append(c + '_売上比率')
-        #
-        # columns_li_qty = []
-        # for c in list(df_sales_qty_pivot_by_chanel.columns.values):
-        #     if c.count("_販売比率"):
-        #         continue
-        #     columns_li_qty.append(c)
-        #     if c in self.chanel_li:
-        #         columns_li_qty.append(c + '_販売比率')
+        # 部門別JAN数取得
+        df_jan_num_by_dept = self.util.select_jan_num_by_dept(self.sql_cli)
+        df_sales_pivot_by_chanel = pd.merge(df_sales_pivot_by_chanel,df_jan_num_by_dept)
+        df_sales_qty_pivot_by_chanel = pd.merge(df_sales_qty_pivot_by_chanel,df_jan_num_by_dept)
 
-        # self.util.df_to_csv(df_sales_pivot_by_chanel.ix[:, columns_li_amount], dir=self.bsa_s.OUTPUT_DIR,
-        #                     file_name='チェネル別部門別売上金額_横持.csv')
-        # self.util.df_to_csv(df_sales_qty_pivot_by_chanel.ix[:, columns_li_qty], dir=self.bsa_s.OUTPUT_DIR,
-        #                     file_name='チェネル別部門別販売量_横持.csv')
         self.util.df_to_csv(df_sales_pivot_by_chanel, dir=self.bsa_s.OUTPUT_DIR,
-                            file_name='チェネル別部門別売上金額_横持.csv')
+                            file_name='チャネル別部門別売上金額_横持.csv')
         self.util.df_to_csv(df_sales_qty_pivot_by_chanel, dir=self.bsa_s.OUTPUT_DIR,
-                            file_name='チェネル別部門別販売量_横持.csv')
+                            file_name='チャネル別部門別販売量_横持.csv')
+
         # df_sales_qty_pivot_by_chanel = df_sales_qty_pivot_by_chanel.set_index('vcItemCategory1Name')
         # sns.heatmap(df_sales_qty_pivot_by_chanel['BicEC_販売比率'])
         # plt.savefig('./sample.png')
