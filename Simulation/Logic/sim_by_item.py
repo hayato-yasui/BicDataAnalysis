@@ -22,7 +22,7 @@ class SimByItem:
         self.preprc_s = PreprocessSetting()
         self.mmt = MergeMasterTable()
         self.mmt_s = MergeMasterTableSetting()
-        self.df_tgt_item = self.df_prdct_priod = None
+        self.df_tgt_item = self.df_prdct_priod = pd.DataFrame
         # self.store_cd = self.distro_cd = self.item_cd = None
 
     def execute(self):
@@ -97,7 +97,7 @@ class SimByItem:
 
     def _fetch_min_max_inv(self, df, sql_cli, floor_date, upper_date, use_calced_fctr=True, ):
         if use_calced_fctr:
-            sql_li = [SQL_DICT['select_min_max_inv'].format(tore_cd=row[1]['store_cd'], item_cd=row[1]['item_cd'],
+            sql_li = [SQL_DICT['select_min_max_inv'].format(store_cd=row[1]['store_cd'], item_cd=row[1]['item_cd'],
                                                             tgt_date=upper_date) for row in df.iterrows()]
             sql = 'union all '.join(sql_li)
             df_min_max_inv = pd.read_sql(sql, sql_cli.conn)
@@ -108,21 +108,22 @@ class SimByItem:
          - 日別で発注可能か納品可能かを算出
          - ロット数を取得(まとめ発注)
          - 最低、最高在庫数を設定(デフォルト or 計算)
-         - 次回発注商品の到着日を算出
-         - γを算出:
+         - 日別で次回発注商品の販売開始日(γ)を算出
         """
+        # ToDo : DCの時のLTの設定
         df_ord_dst_info = self._fetch_ord_dst_info()
         df_ord_lot_num = self._fetch_ord_lot_num(self.df_tgt_item, self.sql_cli, self.bsa_s.TGT_UPPER_DATE)
         df_ord_info = pd.merge(df_ord_dst_info, df_ord_lot_num)
         df_min_max_inv = self._fetch_min_max_inv(self.df_tgt_item, self.sql_cli, self.bsa_s.TGT_FLOOR_DATE,
                                                  self.bsa_s.TGT_UPPER_DATE, True)
         df_ord_info = pd.merge(df_ord_info, df_min_max_inv)
-        df_ord_info["日付"] = pd.to_datetime(df_ord_info["日付"])
         df_ord_info["次回発注商品販売日"] = None
-        for row in self.df_tgt_item.itrrows():
+        list_of_dfs = []
+        for row in self.df_tgt_item.iterrows():
             df_ord_by_item = df_ord_info[
                 (df_ord_info['store_cd'] == row[1]['store_cd']) & (df_ord_info['item_cd'] == row[1]['item_cd'])]
-            df_prdct_priod = self.df_prdct_priod.append(self._calc_prdct_priod(df_ord_by_item))
+            list_of_dfs.append(self._calc_prdct_priod(df_ord_by_item))
+        df_prdct_priod = pd.concat(list_of_dfs, axis=1)
         return df_prdct_priod
 
     def _calc_prdct_priod(self, df_ord_info):
@@ -130,26 +131,30 @@ class SimByItem:
             if row[1]['発注可能'] == 0:
                 continue
             next_ord = row[1]['日付'] + datetime.timedelta(1)
-            for i in range((self.bsa_s.TGT_UPPER_DATE - next_ord).days + 1):
+            for i in range((datetime.datetime.strptime(str(self.bsa_s.TGT_UPPER_DATE), '%Y-%m-%d') - next_ord).days):
                 if len(df_ord_info[(df_ord_info["日付"] == next_ord + datetime.timedelta(i))
                                    & (df_ord_info["発注可能"] == 1)]) == 1:
                     next_ord = next_ord + datetime.timedelta(i)
+                    break
             ship_date = None
             possible_ship_date = next_ord + datetime.timedelta(row[1]["出荷LT"])
-            for i in range((self.bsa_s.TGT_UPPER_DATE - next_ord).days + 1):
+            for i in range(
+                    (datetime.datetime.strptime(str(self.bsa_s.TGT_UPPER_DATE), '%Y-%m-%d') - possible_ship_date).days):
                 if len(df_ord_info[(df_ord_info["日付"] == possible_ship_date + datetime.timedelta(i)) & (
-                        df_ord_info["発注可能"] == 1)]) == 1:
+                        df_ord_info["納品可能"] == 1)]) == 1:
                     ship_date = possible_ship_date + datetime.timedelta(i)
                     break
             if ship_date is None:
                 continue
 
-            possible_del_date = ship_date + datetime.timedelta(row[1]["納品LT"])
-            for i in range((self.bsa_s.TGT_UPPER_DATE - possible_del_date).days + 1):
+            possible_del_date = ship_date + datetime.timedelta(row[1]["配送LT"])
+            for i in range((datetime.datetime.strptime(str(self.bsa_s.TGT_UPPER_DATE),
+                                                       '%Y-%m-%d') - possible_del_date).days + 1):
                 if len(df_ord_info[(df_ord_info["日付"] == possible_del_date + datetime.timedelta(i)) & (
                         df_ord_info["納品可能"] == 1)]) == 1:
                     del_date = possible_del_date + datetime.timedelta(i)
-                    df_ord_info.loc[df_ord_info['日付'] == row[1]["日付"], '次回発注商品販売日'] = del_date
+                    # 商品到着の次の日から販売可能となるため、del_date+1日
+                    df_ord_info.loc[df_ord_info['日付'] == row[1]["日付"], '次回発注商品販売日'] = del_date + datetime.timedelta(1)
                     break
         return df_ord_info
 
@@ -157,39 +162,39 @@ class SimByItem:
         df_ord_div = self._fetch_ord_div(self.df_tgt_item, self.sql_cli, self.bsa_s.TGT_FLOOR_DATE,
                                          self.bsa_s.TGT_UPPER_DATE)
         # 仕入れ先区分を"1"と指定しておき、df_ord_divと結合
-        df_supprier_cd = self._fetch_supprier_cd(self.df_tgt_item, self.sql_cli, self.bsa_s.TGT_FLOOR_DATE,
-                                                 self.bsa_s.TGT_UPPER_DATE)
-        df_ord_dst_info = pd.merge(df_ord_div, df_supprier_cd, how="left", on={"日付", 'item_cd', 'store_cd', "仕入れ先区分"})
+        df_supprier_cd = self._fetch_supprier_cd(self.df_tgt_item, self.sql_cli, self.bsa_s.TGT_UPPER_DATE)
+        df_ord_dst_info = pd.merge(df_ord_div, df_supprier_cd, how="left", on=['store_cd', 'item_cd', '仕入れ先区分'])
         df_supprier_special_hol = self._fetch_supplier_special_holiday(
             df_ord_dst_info, self.sql_cli, self.bsa_s.TGT_FLOOR_DATE, self.bsa_s.TGT_UPPER_DATE)
+        df_ord_dst_info["日付"] = pd.to_datetime(df_ord_dst_info["日付"])
         df_ord_dst_info = pd.merge(df_ord_dst_info, df_supprier_special_hol, how="left")
 
         df_ord_delivery_timing_and_lt = self._fetch_ord_delivery_timing_and_lt(
             df_ord_dst_info, self.sql_cli, self.bsa_s.TGT_FLOOR_DATE, self.bsa_s.TGT_UPPER_DATE)
         df_ord_dst_info = pd.merge(df_ord_dst_info, df_ord_delivery_timing_and_lt, how="left",
-                                   on={'item_cd', 'store_cd', 'supplier_cd'})
+                                   on=['日付', 'item_cd', 'store_cd', 'supplier_cd'])
 
-        df_ord_dst_info['発注可能'] = df_ord_dst_info.apply(lambda x: 0 if x['発注不能'] == 1 else x['発注可能'])
-        df_ord_dst_info['納品可能'] = df_ord_dst_info.apply(lambda x: 0 if x['納品不能'] == 1 else x['納品可能'])
-        return df_ord_dst_info.drop(['発注不能', '納品不能'])
+        df_ord_dst_info['発注可能'] = df_ord_dst_info.apply(lambda x: 0 if x['発注不能'] == 1 else x['発注可能'], axis=1)
+        df_ord_dst_info['納品可能'] = df_ord_dst_info.apply(lambda x: 0 if x['納品不能'] == 1 else x['納品可能'], axis=1)
+        return df_ord_dst_info.drop(['発注不能', '納品不能'], axis=1)
 
-    def _fetch_supprier_cd(self, df, sql_cli, floor_date, upper_date):
-        sql_li = []
-        for row in df.iterrows():
-            sql_li = [SIM_SQL_DICT['select_supplier_cd'].format(tore_cd=row[1]['store_cd'], item_cd=row[1]['item_cd'],
-                                                                tgt_date=floor_date + datetime.timedelta(i)) for i
-                      in range((upper_date - floor_date).days + 1)]
+    def _fetch_supprier_cd(self, df, sql_cli, tgt_date):
+        sql_li = [SIM_SQL_DICT['select_supplier_cd'].format(store_cd=row[1]['store_cd'], item_cd=row[1]['item_cd'],
+                                                            tgt_date=tgt_date) for row in df.iterrows()]
         sql = 'union all '.join(sql_li)
         return pd.read_sql(sql, sql_cli.conn)
 
     def _fetch_ord_div(self, df, sql_cli, floor_date, upper_date):
         sql_li = []
         for row in df.iterrows():
-            sql_li = [SIM_SQL_DICT['select_ord_div'].format(store_cd=row[1]['store_cd'], item_cd=row[1]['item_cd'],
-                                                            tgt_date=floor_date + datetime.timedelta(i)) for i
-                      in range((upper_date - floor_date).days + 1)]
+            s = [SIM_SQL_DICT['select_ord_div'].format(store_cd=row[1]['store_cd'], item_cd=row[1]['item_cd'],
+                                                       tgt_date=upper_date,
+                                                       dummy_date=floor_date + datetime.timedelta(i)) for i in
+                 range((upper_date - floor_date).days + 1)]
+            sql_li.extend(s)
         sql = 'union all '.join(sql_li)
         return pd.read_sql(sql, sql_cli.conn)
+
 
     def _fetch_event(self, from_db=False, from_csv=False) -> pd.DataFrame:
         if from_db:
@@ -208,23 +213,27 @@ class SimByItem:
         sql_li = []
         df_tgt_date = df[df['日付'] == upper_date]
         for row in df_tgt_date.iterrows():
-            sql_li = [SIM_SQL_DICT['select_ord_delivery_timing_and_lt'].format(supplier_cd=row[1]['supplier_cd'],
-                                                                               store_cd=row[1]['store_cd'],
-                                                                               item_cd=row[1]['item_cd'],
-                                                                               tgt_date=upper_date,
-                                                                               dummy_date=floor_date + datetime.timedelta(
+            s = [SIM_SQL_DICT['select_ord_delivery_timing_and_lt'].format(supplier_cd=row[1]['supplier_cd'],
+                                                                          store_cd=row[1]['store_cd'],
+                                                                          item_cd=row[1]['item_cd'],
+                                                                          tgt_date=upper_date,
+                                                                          dummy_date=floor_date + datetime.timedelta(
                                                                                    i))
-                      for i in range((upper_date - floor_date).days + 1) if row[1]['仕入れ先区分'] == 1]
+                 for i in range((upper_date - floor_date).days + 1) if row[1]['仕入れ先区分'] == '1']
+            sql_li.extend(s)
         sql = 'union all '.join(sql_li)
-        return pd.read_sql(sql, sql_cli.conn)
+        df_from_sql = pd.read_sql(sql, sql_cli.conn)
+        df_from_sql["日付"] = pd.to_datetime(df_from_sql["日付"])
+        return df_from_sql
 
     def _fetch_supplier_special_holiday(self, df, sql_cli, floor_date, upper_date):
         sql_li = []
         for row in df.iterrows():
-            sql_li = [SIM_SQL_DICT['select_supplier_special_holiday'].format(
+            s = [SIM_SQL_DICT['select_supplier_special_holiday'].format(
                 supplier_cd=row[1]['supplier_cd'], store_cd=row[1]['store_cd'],
                 item_cd=row[1]['item_cd'], tgt_date=floor_date + datetime.timedelta(i))
-                for i in range((upper_date - floor_date).days + 1) if row["仕入れ先区分"] == '1']
+                for i in range((upper_date - floor_date).days + 1) if row[1]['仕入れ先区分'] == '1']
+            sql_li.extend(s)
         sql = 'union all '.join(sql_li)
         df_hol = pd.read_sql(sql, sql_cli.conn).drop_duplicates()
         df_hol_ord = pd.DataFrame(columns=["supplier_cd", "store_cd", "item_cd", '日付', "発注不能"])
@@ -233,20 +242,22 @@ class SimByItem:
         for row in df_hol.iterrows():
             if row[1]["発注不能日数"] is None:
                 continue
-            for dateadd in row[1]["発注不能日数"]:
+            for dateadd in range(row[1]["発注不能日数"] + 1):
                 date = datetime.datetime.strptime((row[1]['発注不能開始日']), '%Y%m%d') + datetime.timedelta(dateadd)
                 df_new_rec = pd.DataFrame(
-                    [row[1]['supplier_cd'], row[1]['store_cd'], row[1]['item_cd'], date, 1], columns=df_hol_ord.columns)
+                    [[row[1]['supplier_cd'], row[1]['store_cd'], row[1]['item_cd'], date, 1]],
+                    columns=df_hol_ord.columns)
                 df_hol_ord = df_hol_ord.append(df_new_rec)
-        for row in df_hol_del.iterrows():
+        for row in df_hol.iterrows():
             if row[1]["納品不能日数"] is None:
                 continue
-            for dateadd in range(1, row[1]["納品不能日数"]):
+            for dateadd in range(row[1]["納品不能日数"] + 1):
                 date = datetime.datetime.strptime((row[1]['納品不能開始日']), '%Y%m%d') + datetime.timedelta(dateadd)
                 df_new_rec = pd.DataFrame(
-                    [row[1]['supplier_cd'], row[1]['store_cd'], row[1]['item_cd'], date, 1], columns=df_hol_del.columns)
-                df_hol_ord = df_hol_ord.append(df_new_rec)
-        return pd.merge(df_hol_ord, df_hol_ord, how="outer")
+                    [[row[1]['supplier_cd'], row[1]['store_cd'], row[1]['item_cd'], date, 1]],
+                    columns=df_hol_del.columns)
+                df_hol_del = df_hol_del.append(df_new_rec)
+        return pd.merge(df_hol_ord, df_hol_del, how="outer")
 
     def _fetch_inv_qty(self, df, sql_cli, floor_date=datetime.date(2018, 5, 1), upper_date=datetime.date(2018, 7, 31)):
         sql_li = []

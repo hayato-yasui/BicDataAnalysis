@@ -14,8 +14,8 @@ SIM_SQL_DICT = {
         
     """,
     'select_ord_lot_num': """
-        SELECT [dtIfBusinessDate] AS 日付
-            ,'{store_cd}' AS store_cd
+        SELECT --[dtIfBusinessDate] AS 日付
+            '{store_cd}' AS store_cd
             ,[vcItemCd] AS item_cd
             ,[nLotNum] AS 発注単位
         FROM [AFSForBiccamera_DataStore].[dbo].[T_INF_Item]
@@ -25,12 +25,12 @@ SIM_SQL_DICT = {
     """,
     'select_ord_delivery_timing_and_lt': """
     SELECT '{dummy_date}' AS 日付
-          ,[vcSupplierCd] AS supplier_cd
-          ,[vcSiteCd] as store_cd
+          ,'{supplier_cd}' AS supplier_cd
+          ,'{store_cd}' as store_cd
           ,'{item_cd}' as item_cd
           ,[nSupplierLeadTime] AS 総LT
           ,[nShipmentLeadTime] AS 出荷LT
-          ,[nDeliveryLeadTime] AS 納品LT
+          ,[nDeliveryLeadTime] AS 配送LT
           ,CASE DATEPART(WEEKDAY, '{dummy_date}')
                 WHEN 1 THEN  [nOrderDecision_Sun] 
                 WHEN 2 THEN  [nOrderDecision_Mon] 
@@ -63,7 +63,7 @@ SIM_SQL_DICT = {
         ,CONVERT(NVARCHAR, [dtNonOrderStartDate], 112) AS 発注不能開始日
         --,[dtNonOrderEndDate] AS 発注不能終了日
         ,DATEDIFF(day,dtNonOrderEndDate,dtNonOrderStartDate) AS 発注不能日数
-        ,,CONVERT(NVARCHAR,[dtNonDeliveryStartDate], 112) AS 納品不能開始日
+        ,CONVERT(NVARCHAR,[dtNonDeliveryStartDate], 112) AS 納品不能開始日
         --,[dtNonDeliveryEndDate] AS 納品不能終了日
         ,DATEDIFF(day,dtNonDeliveryEndDate,dtNonDeliveryStartDate) AS 納品不能日数
   FROM [AFSForBiccamera_DataStore].[dbo].[T_INF_SupplierHoliday]
@@ -73,7 +73,8 @@ SIM_SQL_DICT = {
 
     """,
     'select_ord_div': """
-    SELECT [dtIfBusinessDate] AS 日付
+    SELECT '{dummy_date}' AS 日付
+        -- [dtIfBusinessDate] AS 日付
         ,'{store_cd}' AS store_cd
         ,'{item_cd}' AS item_cd
         ,[nOrderDiv] AS 仕入れ先区分
@@ -84,8 +85,9 @@ SIM_SQL_DICT = {
 
 """,
     'select_supplier_cd': """
-   SELECT  [dtIfBusinessDate] AS 日付
-         ,[vcItemCd] AS item_cd
+   SELECT -- [dtIfBusinessDate] AS 日付
+         --,
+         [vcItemCd] AS item_cd
          ,[vcSiteCd] AS store_cd
          ,[nSupplierCd] AS supplier_cd
          ,'1' AS 仕入れ先区分
