@@ -5,12 +5,14 @@ import pandas as pd
 import csv
 import datetime
 import matplotlib.pyplot as plt
+from sklearn.preprocessing import Imputer
 from typing import List, Dict, Tuple
 
 from Common.DB.sql import *
 
 
 class Util:
+    imr = Imputer(missing_values='NaN', strategy='most_frequent', axis=0)
 
     @staticmethod
     def create_dir(path):
@@ -27,6 +29,12 @@ class Util:
         if not os.path.exists(dir):
             os.mkdir(dir)
         df.to_csv(dir + '/' + file_name, encoding='cp932', index=index)
+
+    @staticmethod
+    def datetime_to_date(df, column_li):
+        for c in column_li:
+            df[c] = df[c].dt.date
+        return df
 
     @staticmethod
     def moving_average(df, col_name, period):
@@ -83,7 +91,8 @@ class Util:
 
     def select_ec_total_sales_by_chanel(self, sql_cli, floor_date='2018/7/1', upper_date='2018/7/31',
                                         does_output=False, dir=None, file_name=None) -> pd.DataFrame:
-        sql = SQL_DICT['select_ec_total_sales_by_chanel'].format(floor_date=floor_date, upper_date=upper_date)
+        # sql = SQL_DICT['select_ec_total_sales_by_chanel'].format(floor_date=floor_date, upper_date=upper_date)
+        sql = SQL_DICT['select_ec_total_sales_by_chanel_and_item'].format(floor_date=floor_date, upper_date=upper_date)
         df = pd.read_sql(sql, sql_cli.conn
                          # , index_col='HIRE_DATE'
                          # , parse_dates='HIRE_DATE'
@@ -128,7 +137,7 @@ class Util:
         return pd.read_sql(sql, sql_cli.conn)
 
     @staticmethod
-    def select_sales_amount_by_item(sql_cli, store_cd, item_cd, floor_date=datetime.date(2018, 7, 1),
+    def select_sales_amount_by_item(sql_cli, store_cd, item_cd, floor_date=datetime.date(2017, 8, 1),
                                     upper_date=datetime.date(2018, 7, 31)) -> pd.DataFrame:
         sql_li = [SQL_DICT['select_sales_amount_by_item'].format(store_cd=store_cd, item_cd=item_cd,
                                                                  tgt_date=floor_date + datetime.timedelta(i)) for i in
@@ -145,7 +154,24 @@ class Util:
         return df_sales.sort_values("日付")
 
     @staticmethod
-    def select_inv_by_item(sql_cli, store_cd, item_cd, floor_date=datetime.date(2018, 7, 1),
+    def select_price_by_item(sql_cli, store_cd, item_cd, floor_date=datetime.date(2017, 8, 1),
+                             upper_date=datetime.date(2018, 7, 31)) -> pd.DataFrame:
+        sql_li = [SQL_DICT['select_price_by_item'].format(store_cd=store_cd, item_cd=item_cd,
+                                                          tgt_date=floor_date + datetime.timedelta(i)) for i in
+                  range((upper_date - floor_date).days + 1)]
+        sql = 'union all'.join(sql_li)
+        df_price = pd.read_sql(sql, sql_cli.conn)
+
+        for i in range((upper_date - floor_date).days + 1):
+            if len(df_price[df_price["日付"].astype(str) == str(floor_date + datetime.timedelta(i))]) == 0:
+                df_no_sales = pd.DataFrame([(floor_date + datetime.timedelta(i), store_cd, item_cd, 0)],
+                                           columns=['日付', 'store_cd', 'item_cd', '売価'])
+                df_price = pd.concat([df_price, df_no_sales])
+            df_price['日付'] = pd.to_datetime(df_price.日付)
+        return df_price.sort_values("日付")
+
+    @staticmethod
+    def select_inv_by_item(sql_cli, store_cd, item_cd, floor_date=datetime.date(2017, 8, 1),
                            upper_date=datetime.date(2018, 7, 31)) -> pd.DataFrame:
         # tgt_date_li = ['\'' + str(floor_date + datetime.timedelta(i)) + '\'' for i in
         #                range((upper_date - floor_date).days + 1)]
@@ -163,3 +189,19 @@ class Util:
         dept_cd = ','.join(["\'" + str(d) + "\'" for d in dept_cd_li])
         sql = SQL_DICT['select_all_item_using_dept'].format(store_cd=store_cd, dept_cd=dept_cd, tgt_date=tgt_date)
         return pd.read_sql(sql, sql_cli.conn)
+
+    def adjust_0_sales(self,df, floor_date, upper_date):
+        df = df.reset_index(drop=True)
+        for i in range((upper_date - floor_date).days + 1):
+            date = datetime.datetime.strptime(str(floor_date + datetime.timedelta(i)), '%Y-%m-%d')
+            sales_start_date = df[:1]['日付']
+            if sales_start_date[0] >= date:
+                continue
+            if len(df[df['日付'] == date]) == 0:
+                df = pd.concat(
+                    [df, pd.DataFrame([[date, 0]], columns=["日付", '販売数'])])
+        for c in df.columns:
+            if c in ["日付", '販売数']:
+                continue
+            df[c] = df[:1][c]
+        return df.sort_values('日付')

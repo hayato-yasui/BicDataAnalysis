@@ -3,67 +3,73 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 from Common.DB.SQLServer_Client import SQLServerClient
+from AnalysisLogic.Resource.SQL.Rakuten_sql import *
 from Common.DB.sql import *
 from Common.util import Util
-from Common.Setting.BicEC_ShortageAnalysisSetting import *
+from Common.Setting.Rakuten_PointUPAnalysisSetting import *
 from Common.Logic.Preprocess import *
 from Common.Setting.Common.PreprocessSetting import *
 
 
-class BicECShortageAnalysis:
+class RakutenPointUPAnalysis:
     def __init__(self):
         self.sql_cli = SQLServerClient()
         self.util = Util()
-        self.bsa_s = BicECShortageAnalysisSetting()
+        self.rpa_s = RakutenPointUPAnalysisSetting()
         self.mmt = MergeMasterTable()
         self.mmt_s = MergeMasterTableSetting()
         self.df_shortage = self.df_master = None
 
     def execute(self):
-        # self._preprocess()
-        # self.df_shortage = self.extract_shortage_of_tgt_dept()
-        # self.df_master = self._fetch_master()
-        # self.df_tran = self._fetch_tran()
-        # df_output = pd.merge(self.df_master, self.df_shortage, on=['item_cd'])
-        # df_output = pd.merge(df_output, self.df_tran)
-        # self.util.df_to_csv(df_output, './data/Output/sample/', "欠品マス目.csv")
-
-        self._create_daily_sales_inv_amount_by_item()
+        df_sales_by_item = self._fetch_sales_by_item()
+        self.util.df_to_csv(df_sales_by_item, self.rpa_s.OUTPUT_DIR, '楽天_JAN別日別販売数.csv')
+        df_sales_spike = self._extract_sales_spike(df_sales_by_item, a=2)
+        self.util.df_to_csv(df_sales_spike, self.rpa_s.OUTPUT_DIR, '楽天_JAN別日別販売数(スパイクフラグ付き).csv')
+        # self._create_daily_sales_inv_amount_by_item()
         # self._extract_sales_spike()
 
     def _preprocess(self):
         pass
 
-    def _extract_sales_spike(self):
-        a = 2
-        df_tgt_item = self._fetch_tgt_item()
-        df_sales_spike = pd.DataFrame()
-        for row in df_tgt_item.iterrows():
-            df_sales_by_item = self.util.select_sales_amount_by_item(self.sql_cli, store_cd=row[1]['store_cd'],
-                                                                     item_cd=row[1]['item_cd'])
+    def _fetch_sales_by_item(self):
+        df_all_sales = pd.DataFrame
+        tgt_date_li = ['\'' + str(self.rpa_s.TGT_FLOOR_DATE + datetime.timedelta(i)) + '\'' for i in
+                       range((self.rpa_s.TGT_UPPER_DATE - self.rpa_s.TGT_FLOOR_DATE).days + 1)]
+        tgt_date = ','.join(tgt_date_li)
+        sql = RAKUTEN_SQL_DICT['select__sales_by_chanel_and_item'].format(tgt_date=tgt_date,
+                                                                          upper_date=self.rpa_s.TGT_UPPER_DATE)
+        df = pd.read_sql(sql, self.sql_cli.conn)
 
-            df_sales_spike_by_item = self._calc_sales_spike(df_sales_by_item, a)
-            df_daily_inv = self.util.select_inv_by_item(self.sql_cli, store_cd=row[1]['store_cd'],
-                                                        item_cd=row[1]['item_cd'])
-            df_sales_spike_by_item = pd.merge(df_sales_spike_by_item, df_daily_inv, how='outer')
-            df_sales_spike = df_sales_spike.append(df_sales_spike_by_item, ignore_index=True)
-        df_sales_spike = pd.merge(df_sales_spike, df_tgt_item)
-        self.util.df_to_csv(df_sales_spike, './data/Output/sample/', "販売スパイク_" + str(a) + ".csv")
-        return df_sales_spike
+        for jan in df['item_cd'].drop_duplicates().tolist():
+            df_sales = self.util.adjust_0_sales(df[df["item_cd"] == str(jan)], self.rpa_s.TGT_FLOOR_DATE,
+                                                self.rpa_s.TGT_UPPER_DATE)
+            if df_all_sales.empty:
+                df_all_sales = df_sales
+            else:
+                df_all_sales = df_all_sales.append(df_sales)
+        return df_all_sales
+
+    def _extract_sales_spike(self, df_sales_by_item, a):
+        df_sales_spike_by_item = self._calc_sales_spike(df_sales_by_item, a)
+        self.util.df_to_csv(df_sales_spike_by_item, './data/Output/sample/', "販売スパイク_" + str(a) + ".csv")
+        return df_sales_spike_by_item
 
     def _calc_sales_spike(self, df, a=2):
-        # 平均と標準偏差
-        average = np.mean(df["販売数"])
-        sd = np.std(df["販売数"])
+        df['年月'] = df['日付'].dt.year.astype(str) + df['日付'].dt.month.astype(str)
+        df_m = df
+        df_m.drop('日付', axis=1, inplace=True)
+        df_m = df_m.groupby(['年月', '発注GP', 'store_cd', '部門コード', '部門名', '商品名', 'item_cd'])
 
-        # 外れ値の基準点
-        # outlier_min = average - (sd) * a
-        outlier_max = average + (sd) * a
-        df["μ"] = average
-        df["μ+" + str(a) + "σ"] = outlier_max
+        # 平均と標準偏差
+        df_m_avg = df_m[['販売数']].mean().reset_index()
+        df_m_std = df_m[['販売数']].std().reset_index()
+        df_m_avg_std = pd.merge(df_m_avg.rename(columns={'販売数': 'μ'}), df_m_std.rename(columns={'販売数': 'σ'}))
+
+        df_m_avg_std['μ+' + str(a) + "σ"] = df_m_avg_std['μ'] + a * df_m_avg_std['σ']
+        df = pd.merge(df, df_m_avg_std)
         if df.empty:
             return
-        df['スパイク日'] = df.apply(lambda x: 1 if x['販売数'] >= outlier_max else 0, axis=1)
+        df['スパイク日'] = df.apply(lambda x: 1 if x['販売数'] >= x["μ+" + str(a) + "σ"] else 0, axis=1)
         return df
 
     def _fetch_tgt_item(self):
@@ -80,7 +86,7 @@ class BicECShortageAnalysis:
             df_sales_by_item = self.util.select_sales_amount_by_item(self.sql_cli, store_cd=row[1]['store_cd'],
                                                                      item_cd=row[1]['item_cd'])
             df_price_by_item = self.util.select_price_by_item(self.sql_cli, store_cd=row[1]['store_cd'],
-                                                                     item_cd=row[1]['item_cd'])
+                                                              item_cd=row[1]['item_cd'])
             df_sales_pivot_by_chanel = df_sales_by_item.pivot_table(
                 index=['日付', 'store_cd', 'item_cd'], columns='chanel_cd', values='販売数', aggfunc=sum).reset_index()
             df_sales_inv_by_item = pd.merge(df_inv_by_item, df_sales_pivot_by_chanel, how="outer",
@@ -125,6 +131,6 @@ class BicECShortageAnalysis:
 
 
 if __name__ == '__main__':
-    bsa = BicECShortageAnalysis()
-    bsa.execute()
+    rpa = RakutenPointUPAnalysis()
+    rpa.execute()
     print("END")

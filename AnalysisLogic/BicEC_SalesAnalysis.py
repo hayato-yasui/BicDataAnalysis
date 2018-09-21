@@ -31,7 +31,7 @@ class BicECSalesAnalysis:
     def extract_sales_qty_by_chanel(self):
         df_sales_by_chanel = self.util.select_ec_total_sales_by_chanel(self.sql_cli, does_output=True,
                                                                        dir=self.bsa_s.OUTPUT_DIR,
-                                                                       file_name='チャネル別部門別売上金額_縦持.csv')
+                                                                       file_name='商品別チャネル別部門別売上金額_縦持.csv')
         df_sales_by_chanel = self.mmt.merge_chanel(df_sales_by_chanel, self.mmt_s.F_PATH_CHANEL)
 
         # 0.49以下をNullとする
@@ -44,17 +44,21 @@ class BicECSalesAnalysis:
         #     for c in ['売上金額', '販売数']:
         #         df_sales_by_chanel[]
 
-        df_sales_by_dept = df_sales_by_chanel.groupby('部門コード')['売上金額', '販売数'].sum().reset_index()
+        # df_sales_by_dept = df_sales_by_chanel.groupby('部門コード')['売上金額', '販売数'].sum().reset_index()
+        df_sales_by_dept = df_sales_by_chanel.groupby('JANコード')['売上金額', '販売数'].sum().reset_index()
         df_sales_by_dept.rename(columns={'売上金額': '売上金額_sum', '販売数': '販売数_sum'}, inplace=True)
 
-        index = ['発注GP', '部門コード', '部門名']
+        # index = ['発注GP', '部門コード', '部門名']
+        index = ['発注GP', '部門コード', '部門名','JANコード','商品名']
         df_sales_pivot_by_chanel = df_sales_by_chanel.pivot_table(index=index, columns='店舗名称', values='売上金額',
                                                                   aggfunc=sum).reset_index()
         df_sales_qty_pivot_by_chanel = df_sales_by_chanel.pivot_table(index=index, columns='店舗名称', values='販売数',
                                                                       aggfunc=sum).reset_index()
 
-        df_sales_pivot_by_chanel = pd.merge(df_sales_pivot_by_chanel, df_sales_by_dept, on='部門コード')
-        df_sales_qty_pivot_by_chanel = pd.merge(df_sales_qty_pivot_by_chanel, df_sales_by_dept, on='部門コード')
+        # df_sales_pivot_by_chanel = pd.merge(df_sales_pivot_by_chanel, df_sales_by_dept, on='部門コード')
+        # df_sales_qty_pivot_by_chanel = pd.merge(df_sales_qty_pivot_by_chanel, df_sales_by_dept, on='部門コード')
+        df_sales_pivot_by_chanel = pd.merge(df_sales_pivot_by_chanel, df_sales_by_dept, on='JANコード')
+        df_sales_qty_pivot_by_chanel = pd.merge(df_sales_qty_pivot_by_chanel, df_sales_by_dept, on='JANコード')
 
         for c in self.chanel_li:
             df_sales_pivot_by_chanel[c + '_売上比率'] = df_sales_pivot_by_chanel.apply(
@@ -76,9 +80,9 @@ class BicECSalesAnalysis:
         df_sales_qty_pivot_by_chanel = pd.merge(df_sales_qty_pivot_by_chanel,df_jan_num_by_dept)
 
         self.util.df_to_csv(df_sales_pivot_by_chanel, dir=self.bsa_s.OUTPUT_DIR,
-                            file_name='チャネル別部門別売上金額_横持.csv')
+                            file_name='商品別チャネル別部門別売上金額_横持.csv')
         self.util.df_to_csv(df_sales_qty_pivot_by_chanel, dir=self.bsa_s.OUTPUT_DIR,
-                            file_name='チャネル別部門別販売量_横持.csv')
+                            file_name='商品別チャネル別部門別販売量_横持.csv')
 
         # df_sales_qty_pivot_by_chanel = df_sales_qty_pivot_by_chanel.set_index('vcItemCategory1Name')
         # sns.heatmap(df_sales_qty_pivot_by_chanel['BicEC_販売比率'])

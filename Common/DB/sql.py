@@ -333,8 +333,8 @@ SQL_DICT = {
      SELECT [dtBusinessDate] AS 日付
         ,[vcShopCd] AS store_cd
         ,[vcItemCd] AS item_cd
-        ,[nIfInvNum] AS 販売可能在庫
         ,[nInvNum] AS 総在庫量
+        ,[nIfInvNum] AS 販売可能在庫
         ,[nTransportNum] AS 移送中
         ,[nBackOrderNum] AS 発注残
     FROM [AFSForBiccamera_DataStore].[dbo].[T_INF_ShopInv]
@@ -358,6 +358,7 @@ SQL_DICT = {
  'select_sales_amount_by_item': """
       SELECT '{tgt_date}' AS 日付
              ,'{store_cd}' AS store_cd
+             ,[vcSiteCd] AS chanel_cd
              ,'{item_cd}'AS item_cd
              ,CASE WHEN sum([nSalesNum]) IS NULL THEN 0
                ELSE sum([nSalesNum])
@@ -368,9 +369,107 @@ SQL_DICT = {
       AND [vcItemCd] = '{item_cd}'
       GROUP BY
              [dtIfBusinessDate]
-             ,[vcItemCd]
              ,[vcLogisticsCd]
+             ,[vcSiteCd]
       """,
-
-
+    "select_ec_total_sales_by_chanel_and_item": """
+    SELECT 
+        src.vcOrderGPName AS 発注GP,
+        src.vcDepartmentCd AS 部門コード,
+        src.vcItemCategory1Name AS 部門名,
+        src.vcLogisticsCd AS　物流コード,
+        src.vcSiteCd AS 店舗コード,
+        src.vcItemCd AS JANコード,
+        src.vcItemName AS 商品名,
+        AVG(src.nSellingPrice) AS  平均売価,
+        SUM(src.nSalesNum) AS 販売数,
+        SUM(src.売上金額) AS 売上金額
+    FROM
+    (SELECT				 
+        T1.[dtIfBusinessDate],
+        T3.vcOrderGPName,
+        T3.vcDepartmentCd,
+        T3.vcItemCategory1Name,
+        T1.vcItemCd,
+        T2.vcItemName,
+        T1.vcLogisticsCd,
+        T1.vcSiteCd,
+        AVG(T4.nSellingPrice) AS nSellingPrice,
+        SUM(T1.nSalesNum) AS nSalesNum,
+        AVG(T4.nSellingPrice) * SUM(T1.nSalesNum) AS 売上金額
+    FROM 
+    (SELECT [dtIfBusinessDate]
+          ,[vcSiteCd]
+          ,[vcItemCd]
+          ,[vcLogisticsCd]
+          ,[nSalesNum]
+      FROM [AFSForBiccamera_DataStore].[dbo].[T_INF_DistributionBySales]
+      WHERE 1=1
+            AND [dtIfBusinessDate] BETWEEN '{floor_date}' AND '{upper_date}'
+            AND [vcLogisticsCd] =  '861'
+    ) AS T1
+    INNER JOIN
+    (SELECT [vcDepartmentCd]
+           ,[vcItemCd]
+           ,[vcItemName]
+    FROM [AFSForBiccamera_DataStore].[dbo].[T_INF_Item]
+    WHERE  [dtIfBusinessDate]  = '{upper_date}'
+    ) AS T2
+    ON 1=1
+    AND T1.[vcItemCd] = T2.[vcItemCd]
+    INNER JOIN
+    (SELECT [vcDepartmentCd]
+           ,[vcItemCategory1Name]
+           ,vcOrderGPName
+    FROM [AFSForBiccamera_DataStore].[dbo].[T_INF_Department]
+    WHERE  1=1
+        AND [dtIfBusinessDate]  = '{upper_date}'
+    ) AS T3
+    ON 1=1
+    AND T2.[vcDepartmentCd] = T3.[vcDepartmentCd]
+    -- 自発対象のみ抽出
+    INNER JOIN
+    (SELECT 
+            [dtIfBusinessDate]
+            ,vcSiteCd
+            ,vcItemCd
+            ,[nSellingPrice]
+        FROM [AFSForBiccamera_DataStore].[dbo].[T_INF_ShopItem]
+        WHERE dtIfBusinessDate BETWEEN  '{floor_date}' AND '{upper_date}'
+    ) AS T4
+    ON T1.dtIfBusinessDate = T4.dtIfBusinessDate
+        AND T1.vcLogisticsCd = T4.vcSiteCd
+        AND T1.vcItemCd = T4.vcItemCd
+    GROUP BY 
+        T1.dtIfBusinessDate,
+        T3.vcOrderGPName,
+        T3.vcDepartmentCd,
+        T3.vcItemCategory1Name,
+        T1.vcItemCd,
+        T2.vcItemName,
+        T1.vcLogisticsCd,
+        T1.vcSiteCd
+    ) AS src
+    GROUP BY 
+        src.vcOrderGPName,
+        src.vcDepartmentCd,
+        src.vcItemCategory1Name,
+        src.vcLogisticsCd,
+        src.vcSiteCd,
+        src.vcItemCd,
+        src.vcItemName
+    ;
+    """,
+    'select_price_by_item': '''
+        SELECT [dtIfBusinessDate] AS 日付
+          ,'{item_cd}' AS item_cd
+          ,'{store_cd}' AS store_cd
+          --,[nSupplierCd]
+          ,[nSellingPrice] AS 売価 -- 当日末時点の売価
+      FROM [AFSForBiccamera_DataStore].[dbo].[T_INF_ShopItem]AS t
+      WHERE dtIfBusinessDate = '{tgt_date}'
+        AND vcSiteCd = '{store_cd}'
+        AND vcItemCd = '{item_cd}'
+        
+    '''
 }

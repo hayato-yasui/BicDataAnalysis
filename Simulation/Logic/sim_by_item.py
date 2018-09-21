@@ -110,7 +110,6 @@ class SimByItem:
          - 最低、最高在庫数を設定(デフォルト or 計算)
          - 日別で次回発注商品の販売開始日(γ)を算出
         """
-        # ToDo : DCの時のLTの設定
         df_ord_dst_info = self._fetch_ord_dst_info()
         df_ord_lot_num = self._fetch_ord_lot_num(self.df_tgt_item, self.sql_cli, self.bsa_s.TGT_UPPER_DATE)
         df_ord_info = pd.merge(df_ord_dst_info, df_ord_lot_num)
@@ -123,7 +122,7 @@ class SimByItem:
             df_ord_by_item = df_ord_info[
                 (df_ord_info['store_cd'] == row[1]['store_cd']) & (df_ord_info['item_cd'] == row[1]['item_cd'])]
             list_of_dfs.append(self._calc_prdct_priod(df_ord_by_item))
-        df_prdct_priod = pd.concat(list_of_dfs, axis=1)
+        df_prdct_priod = pd.concat(list_of_dfs)
         return df_prdct_priod
 
     def _calc_prdct_priod(self, df_ord_info):
@@ -161,9 +160,10 @@ class SimByItem:
     def _fetch_ord_dst_info(self):
         df_ord_div = self._fetch_ord_div(self.df_tgt_item, self.sql_cli, self.bsa_s.TGT_FLOOR_DATE,
                                          self.bsa_s.TGT_UPPER_DATE)
-        # 仕入れ先区分を"1"と指定しておき、df_ord_divと結合
+        # 発注先：仕入れ先
+        # 仕入れ先区分を"2(仕入れ先)"と指定しておき、df_ord_divと結合
         df_supprier_cd = self._fetch_supprier_cd(self.df_tgt_item, self.sql_cli, self.bsa_s.TGT_UPPER_DATE)
-        df_ord_dst_info = pd.merge(df_ord_div, df_supprier_cd, how="left", on=['store_cd', 'item_cd', '仕入れ先区分'])
+        df_ord_dst_info = pd.merge(df_ord_div, df_supprier_cd, how="inner", on=['store_cd', 'item_cd', '仕入れ先区分'])
         df_supprier_special_hol = self._fetch_supplier_special_holiday(
             df_ord_dst_info, self.sql_cli, self.bsa_s.TGT_FLOOR_DATE, self.bsa_s.TGT_UPPER_DATE)
         df_ord_dst_info["日付"] = pd.to_datetime(df_ord_dst_info["日付"])
@@ -176,7 +176,19 @@ class SimByItem:
 
         df_ord_dst_info['発注可能'] = df_ord_dst_info.apply(lambda x: 0 if x['発注不能'] == 1 else x['発注可能'], axis=1)
         df_ord_dst_info['納品可能'] = df_ord_dst_info.apply(lambda x: 0 if x['納品不能'] == 1 else x['納品可能'], axis=1)
+
+        # 発注先：DC
+        df_dc = self._fetch_dc_lt(self.df_tgt_item, self.sql_cli, self.bsa_s.TGT_UPPER_DATE)
+        df_dc = pd.merge(df_ord_div, df_dc, how="inner", on=['store_cd', 'item_cd', '仕入れ先区分'])
+        df_ord_dst_info = pd.concat([df_ord_dst_info, df_dc])
+        df_ord_dst_info["日付"] = pd.to_datetime(df_ord_dst_info["日付"])
         return df_ord_dst_info.drop(['発注不能', '納品不能'], axis=1)
+
+    def _fetch_dc_lt(self, df, sql_cli, upper_date):
+        sql_li = [SIM_SQL_DICT['select_dc_ord_info'].format(
+            store_cd=row[1]['store_cd'], item_cd=row[1]['item_cd'], tgt_date=upper_date) for row in df.iterrows()]
+        sql = 'union all '.join(sql_li)
+        return pd.read_sql(sql, sql_cli.conn)
 
     def _fetch_supprier_cd(self, df, sql_cli, tgt_date):
         sql_li = [SIM_SQL_DICT['select_supplier_cd'].format(store_cd=row[1]['store_cd'], item_cd=row[1]['item_cd'],
@@ -187,10 +199,9 @@ class SimByItem:
     def _fetch_ord_div(self, df, sql_cli, floor_date, upper_date):
         sql_li = []
         for row in df.iterrows():
-            s = [SIM_SQL_DICT['select_ord_div'].format(store_cd=row[1]['store_cd'], item_cd=row[1]['item_cd'],
-                                                       tgt_date=upper_date,
-                                                       dummy_date=floor_date + datetime.timedelta(i)) for i in
-                 range((upper_date - floor_date).days + 1)]
+            s = [SIM_SQL_DICT['select_ord_div'].format(
+                store_cd=row[1]['store_cd'], item_cd=row[1]['item_cd'], tgt_date=upper_date,
+                dummy_date=floor_date + datetime.timedelta(i)) for i in range((upper_date - floor_date).days + 1)]
             sql_li.extend(s)
         sql = 'union all '.join(sql_li)
         return pd.read_sql(sql, sql_cli.conn)
@@ -219,7 +230,7 @@ class SimByItem:
                                                                           tgt_date=upper_date,
                                                                           dummy_date=floor_date + datetime.timedelta(
                                                                                    i))
-                 for i in range((upper_date - floor_date).days + 1) if row[1]['仕入れ先区分'] == '1']
+                 for i in range((upper_date - floor_date).days + 1) if row[1]['仕入れ先区分'] == '2']
             sql_li.extend(s)
         sql = 'union all '.join(sql_li)
         df_from_sql = pd.read_sql(sql, sql_cli.conn)
@@ -232,7 +243,7 @@ class SimByItem:
             s = [SIM_SQL_DICT['select_supplier_special_holiday'].format(
                 supplier_cd=row[1]['supplier_cd'], store_cd=row[1]['store_cd'],
                 item_cd=row[1]['item_cd'], tgt_date=floor_date + datetime.timedelta(i))
-                for i in range((upper_date - floor_date).days + 1) if row[1]['仕入れ先区分'] == '1']
+                for i in range((upper_date - floor_date).days + 1) if row[1]['仕入れ先区分'] == '2']
             sql_li.extend(s)
         sql = 'union all '.join(sql_li)
         df_hol = pd.read_sql(sql, sql_cli.conn).drop_duplicates()

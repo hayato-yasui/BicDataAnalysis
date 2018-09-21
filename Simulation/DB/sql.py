@@ -90,12 +90,38 @@ SIM_SQL_DICT = {
          [vcItemCd] AS item_cd
          ,[vcSiteCd] AS store_cd
          ,[nSupplierCd] AS supplier_cd
-         ,'1' AS 仕入れ先区分
+         ,'2' AS 仕入れ先区分
          --,[nSellingPrice]
      FROM [AFSForBiccamera_DataStore].[dbo].[T_INF_ShopItem]
        WHERE [dtIfBusinessDate] = '{tgt_date}'
        AND [vcSiteCd] = '{store_cd}'
        AND [vcItemCd] = '{item_cd}'
    """,
+    'select_dc_ord_info': """
+    SELECT  '{store_cd}'AS store_cd
+            ,'{item_cd}' AS item_cd
+            ,'1' AS  仕入れ先区分
+            ,T2.[nLeadTime] AS 出荷LT
+            ,T1.[nLeadTime] AS 配送LT
+            ,1 AS 発注可能
+            ,1 AS 納品可能
+    FROM
+    (SELECT -- [dtBusinessDate]
+           '{store_cd}'AS store_cd
+          ,'{item_cd}' AS item_cd 
+          ,[vcCenterCd]
+          ,[nLeadTime]
+      FROM [AFSForBiccamera_DataStore].[dbo].[M_MST_ShopDailyHistory]
+        WHERE [dtBusinessDate] = '{tgt_date}'
+        AND [vcShopCd] = '{store_cd}') AS T1
+    INNER JOIN
+    (SELECT --[dtBusinessDate]
+          [vcCenterCd]
+          ,[nLeadTime]
+      FROM [AFSForBiccamera_DataStore].[dbo].[M_MST_CenterDailyHistory]
+        WHERE [dtBusinessDate] = '{tgt_date}') AS T2
+    ON T1.vcCenterCd = T2.vcCenterCd
+
+    """,
 
 }
