@@ -36,8 +36,10 @@ class RakutenPointUPAnalysis:
         tgt_date_li = ['\'' + str(self.rpa_s.TGT_FLOOR_DATE + datetime.timedelta(i)) + '\'' for i in
                        range((self.rpa_s.TGT_UPPER_DATE - self.rpa_s.TGT_FLOOR_DATE).days + 1)]
         tgt_date = ','.join(tgt_date_li)
-        sql = RAKUTEN_SQL_DICT['select__sales_by_chanel_and_item'].format(tgt_date=tgt_date,
-                                                                          upper_date=self.rpa_s.TGT_UPPER_DATE)
+        chanel_cd_li = ['\'' + c + '\'' for c in ['846', '253', '736', '089']]
+        chanel_cd = ','.join(chanel_cd_li)
+        sql = RAKUTEN_SQL_DICT['select__sales_by_chanel_and_item'].format(
+            tgt_date=tgt_date, upper_date=self.rpa_s.TGT_UPPER_DATE, chanel_cd=chanel_cd)
         df = pd.read_sql(sql, self.sql_cli.conn)
 
         for jan in df['item_cd'].drop_duplicates().tolist():

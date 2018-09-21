@@ -20,7 +20,7 @@ RAKUTEN_SQL_DICT = {
       WHERE 1=1
             AND [dtIfBusinessDate] IN ({tgt_date})
             AND [vcLogisticsCd] =  '861'
-            AND vcSiteCd IN ('846','253','736','089')
+            AND vcSiteCd IN ({chanel_cd})
     ) AS T1
     INNER JOIN
     (SELECT [vcDepartmentCd]
