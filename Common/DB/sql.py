@@ -1,4 +1,32 @@
 SQL_DICT = {
+    'select_ec_sales': """
+    SELECT [dtIfBusinessDate] AS 日付
+              ,'861'AS store_cd
+              ,[vcSiteCd] AS chanel_cd
+              ,'{item_cd}'AS item_cd
+              ,[nSalesNum] AS 販売数
+          FROM [AFSForBiccamera_DataStore].[dbo].[T_INF_DistributionBySales]
+          WHERE [dtIfBusinessDate] IN ({tgt_date})
+                AND vcLogisticsCd = '861'
+                AND [vcItemCd] = '{item_cd}'
+                
+    """,
+    'select_ec_inv_by_item': """
+     SELECT [dtBusinessDate] AS 日付
+            ,[vcShopCd] AS store_cd
+            ,[vcItemCd] AS item_cd
+            ,[nInvNum] AS 総在庫量
+            ,[nIfInvNum] AS 販売可能在庫
+            ,[nTransportNum] AS 移送中
+            ,[nBackOrderNum] AS 発注残
+        FROM [AFSForBiccamera_DataStore].[dbo].[T_INF_ShopInv]
+        WHERE [dtBusinessDate] IN ({tgt_date})
+        AND [vcShopCd] = '{store_cd}'
+        AND [vcItemCd] = '{item_cd}'
+
+
+""",
+
     'select_item_info': """
         SELECT T2.vcDepartmentCd AS dept_cd
             ,T2.vcItemCategory1Name AS 部門名

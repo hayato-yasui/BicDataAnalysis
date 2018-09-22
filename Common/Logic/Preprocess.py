@@ -281,7 +281,15 @@ class Preprocess:
         sql = 'union all '.join(sql_li)
         return pd.read_sql(sql, sql_cli.conn)
 
+    @staticmethod
+    def merge_sales_by_chanel_group(df,amount_cols_li):
+        df.drop(['chanel_cd',"店舗名称",'店舗属性','法人コード'],axis=1,inplace=True)
+        index_li = df.columns.values.tolist()
+        index_li.remove(amount_cols_li)
+        return df.groupby(index_li).sum().reset_index()
+
 class MergeMasterTable:
+    folder_path = './data/Input/master/'
     def __init__(self):
         self.mmt_s = MergeMasterTableSetting()
 
@@ -313,7 +321,7 @@ class MergeMasterTable:
         df_calender['翌日が休日'] = df_calender.apply(lambda x: 1 if x['翌日が休日'] > 0 else 0, axis=1)
         return pd.merge(df_src, df_calender, left_on='H.集計対象営業年月日', right_on='日付').drop('日付', axis=1)
 
-    def merge_chanel(self, df_src, file_path):
-        df_chanel = pd.read_csv(file_path, encoding='cp932', engine='python')
-        df_chanel['店舗コード'] = df_chanel['店舗コード'].astype(str).str.zfill(3)
-        return pd.merge(df_src, df_chanel, how='inner', on='店舗コード')
+    def merge_chanel(self, df_src):
+        df_chanel = pd.read_csv(self.folder_path + 'chanel.csv', encoding='cp932', engine='python')
+        df_chanel['chanel_cd'] = df_chanel['chanel_cd'].astype(str).str.zfill(3)
+        return pd.merge(df_src, df_chanel, how='inner', on='chanel_cd')

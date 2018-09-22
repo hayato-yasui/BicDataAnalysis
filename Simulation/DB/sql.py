@@ -74,14 +74,26 @@ SIM_SQL_DICT = {
     """,
     'select_ord_div': """
     SELECT '{dummy_date}' AS 日付
+            ,'{store_cd}' AS store_cd
+            ,T2.dept_cd
+            ,'{item_cd}' AS item_cd
+            ,T1.仕入れ先区分
+    FROM
+    (SELECT 
         -- [dtIfBusinessDate] AS 日付
-        ,'{store_cd}' AS store_cd
-        ,'{item_cd}' AS item_cd
-        ,[nOrderDiv] AS 仕入れ先区分
+        [nOrderDiv] AS 仕入れ先区分
     FROM [AFSForBiccamera_DataStore].[dbo].[T_INF_Definition]
     WHERE [dtIfBusinessDate] = '{tgt_date}'
     AND [vcSiteCd] = '{store_cd}'
-    AND [vcItemCd] = '{item_cd}'
+    AND [vcItemCd] = '{item_cd}') AS T1
+    INNER JOIN
+    (SELECT [vcDepartmentCd] AS dept_cd
+    FROM [AFSForBiccamera_DataStore].[dbo].[T_INF_Item]
+    WHERE  [dtIfBusinessDate]  = '{upper_date}'
+        AND vcItemCd = '{item_cd}'
+    ) AS T2
+    ON  1=1
+
 
 """,
     'select_supplier_cd': """
@@ -92,7 +104,7 @@ SIM_SQL_DICT = {
          ,[nSupplierCd] AS supplier_cd
          ,'2' AS 仕入れ先区分
          --,[nSellingPrice]
-     FROM [AFSForBiccamera_DataStore].[dbo].[T_INF_ShopItem]
+         FROM [AFSForBiccamera_DataStore].[dbo].[T_INF_ShopItem]
        WHERE [dtIfBusinessDate] = '{tgt_date}'
        AND [vcSiteCd] = '{store_cd}'
        AND [vcItemCd] = '{item_cd}'
@@ -122,6 +134,10 @@ SIM_SQL_DICT = {
         WHERE [dtBusinessDate] = '{tgt_date}') AS T2
     ON T1.vcCenterCd = T2.vcCenterCd
 
+    """,
+    'select_season_weekend_factor': """
+    
+    
     """,
 
 }
