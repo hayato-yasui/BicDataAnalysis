@@ -22,19 +22,26 @@ class NormalDistribution:
         self.df_inv = df_inv
 
     def execute(self):
+        df_grouped = self._grouped()
         self._calc_avg_std(self.df_training_data)
         # self._create_model
         self._exec_sim()
         print(1)
 
-    def _calc_avg_std(self, df):
-        # 平均と標準偏差
-        df_m_avg = df[['販売数']].mean().reset_index()
-        df_m_std = df[['販売数']].std().reset_index()
-        df_m_avg_std = pd.merge(df_m_avg.rename(columns={'販売数': 'μ'}), df_m_std.rename(columns={'販売数': 'σ'}))
+    def _grouped(self, df):
+        index_li = df.columns.values.tolist()
+        index_li.remove('販売数')
+        return df.groupby(index_li)
 
-        df_m_avg_std['μ+' + str(self.nd_s.a) + "σ"] = df_m_avg_std['μ'] + self.nd_s.a * df_m_avg_std['σ']
-        df = pd.merge(df, df_m_avg_std)
+    def _calc_avg_std(self, df_grouped, upper_date=None, floor_date=None):
+        # 平均と標準偏差
+        df_avg = df_grouped[['販売数']].mean().reset_index()
+        df_std = df_grouped[['販売数']].std().reset_index()
+        df_avg_std = pd.merge(df_avg.rename(columns={'販売数': 'μ'}), df_std.rename(columns={'販売数': 'σ'}))
+
+        df_avg_std['μ+' + str(self.nd_s.a) + "σ"] = df_avg_std['μ'] + self.nd_s.a * df_avg_std['σ']
+        df_avg_std['μ-' + str(self.nd_s.a) + "σ"] = df_avg_std['μ'] - self.nd_s.a * df_avg_std['σ']
+        df = pd.merge(df_grouped, df_avg_std)
 
         return df
 

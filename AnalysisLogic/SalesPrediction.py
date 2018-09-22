@@ -21,7 +21,11 @@ class SalesPrediction:
         self.preprc = Preprocess
 
     def execute(self):
-        df_training_data, df_actual_sales, df_inv = self._preprocess()
+        # df_training_data, df_actual_sales, df_inv = self._preprocess()
+        df_training_data = pd.read_csv(self.sp_s.OUTPUT_DIR + '学習データ.csv', encoding='cp932', engine='python')
+        df_actual_sales = pd.read_csv(self.sp_s.OUTPUT_DIR + '実販売数データ.csv', encoding='cp932', engine='python')
+        df_inv = pd.read_csv(self.sp_s.OUTPUT_DIR + '在庫データ(全期間).csv', encoding='cp932', engine='python')
+
         # self._create_model
         self._exec_sim(df_training_data, df_actual_sales, df_inv)
         print(1)
