@@ -135,9 +135,5 @@ SIM_SQL_DICT = {
     ON T1.vcCenterCd = T2.vcCenterCd
 
     """,
-    'select_season_weekend_factor': """
-    
-    
-    """,
 
 }

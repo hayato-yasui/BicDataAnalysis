@@ -61,6 +61,8 @@ class Util:
                          # , index_col='HIRE_DATE'
                          # , parse_dates='HIRE_DATE'
                          )
+        for c in df.columns:
+            df[c] = df[c].astype(str)
         if does_output:
             self.df_to_csv(df, dir, file_name)
         return df
@@ -238,3 +240,23 @@ class Util:
                     df_all_sales = df_all_sales.append(df_adjusted)
         return df_all_sales
 
+    @staticmethod
+    def select_calced_week_season_factor(df, sql_cli, floor_date, upper_date):
+        df_f_weekend_season= pd.DataFrame
+        df_adjusted = df[['store_cd', 'dept_cd']]
+        df_adjusted = df_adjusted[~df_adjusted.duplicated(['store_cd', 'dept_cd'], keep=False)]
+        dummy_date = ','.join(['\'' + str(floor_date + datetime.timedelta(i)) + '\'' for i in
+                               range((datetime.date(2018, 12, 31) - datetime.date(2018, 1, 1)).days + 1)])
+        for row in df_adjusted.iterrows():
+            for i in range((upper_date - floor_date).days + 1):
+                sql = SQL_DICT['select_season_weekend_factor'].format(
+                    store_cd=row[1]['store_cd'], dept_cd=row[1]['dept_cd'], tgt_date=floor_date + datetime.timedelta(i),
+                    dummy_date=dummy_date)
+                df_from_sql = pd.read_sql(sql, sql_cli.conn)
+                if df_from_sql.empty:
+                    continue
+                if df_f_weekend_season.empty:
+                    df_f_weekend_season = df_from_sql
+                else:
+                    df_f_weekend_season = df_f_weekend_season.append(df_from_sql)
+        return df_f_weekend_season

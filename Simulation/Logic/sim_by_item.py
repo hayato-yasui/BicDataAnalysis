@@ -57,19 +57,14 @@ class SimByItem:
         return df_prdct_priod, df_event
 
     def _calc_factor(self):
-        self._calc_season_weekend(self.sql_cli, self.bsa_s.TGT_FLOOR_DATE, self.bsa_s.TGT_UPPER_DATE, True)
+        df_f_weekend_seaspn = self._calc_season_weekend(self.sql_cli, self.bsa_s.TGT_FLOOR_DATE, self.bsa_s.TGT_UPPER_DATE, True)
         # self._calc_sales_avg(self.sql_cli, self.bsa_s.TGT_FLOOR_DATE, self.bsa_s.TGT_UPPER_DATE, True)
         # self._calc_sales_std(self.sql_cli, self.bsa_s.TGT_FLOOR_DATE, self.bsa_s.TGT_UPPER_DATE, True)
         # self._calc_safty_inv_fctr(self.sql_cli, self.bsa_s.TGT_FLOOR_DATE, self.bsa_s.TGT_UPPER_DATE, True)
 
     def _calc_season_weekend(self, df, sql_cli, floor_date, upper_date, use_calced_fctr=True):
         if use_calced_fctr:
-            sql_li = [SIM_SQL_DICT['select_season_weekend_factor'].format(
-                store_cd=row[1]['store_cd'], dept_cd=row[1]['dept_cd'], floor_date=floor_date, upper_date=upper_date)
-                for row in df.iterrows()]
-            sql = 'union all '.join(sql_li)
-            df_season_weekend = pd.read_sql(sql, sql_cli.conn)
-            return df_season_weekend
+            return self.util.select_calced_week_season_factor(df, sql_cli, floor_date, upper_date)
         return
 
     def _calc_sales_avg(self, sql_cli, store_cd,item_cd, floor_date, upper_date,use_calced_fctr=True,):

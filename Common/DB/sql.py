@@ -499,5 +499,19 @@ SQL_DICT = {
         AND vcSiteCd = '{store_cd}'
         AND vcItemCd = '{item_cd}'
         
-    '''
+    ''',
+    'select_season_weekend_factor': """
+    SELECT  [dtBusinessDate] AS 日付
+        ,'{dept_cd}' AS dept_cd
+        ,'{store_cd}' AS store_cd
+        ,MIN([nFactor]) AS 季節休日係数
+    FROM [AFSForBiccamera_DataStore].[dbo].[M_CLC_SeasonWeekendFactor_Source_Store]
+    WHERE  [dtSnapshotDate] IN ({dummy_date})
+        AND [vcDepartmentCd] = '{dept_cd}'
+        AND [vcSiteCd] = '{store_cd}'
+        AND [dtBusinessDate] ='{tgt_date}'
+    GROUP BY  [dtBusinessDate] 
+
+""",
+
 }
