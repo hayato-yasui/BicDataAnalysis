@@ -21,7 +21,7 @@ class SalesPrediction:
         self.preprc = Preprocess
 
     def execute(self):
-        # df_training_data, df_actual_sales, df_inv = self._preprocess()
+        df_training_data, df_actual_sales, df_inv = self._preprocess()
         df_training_data = pd.read_csv(self.sp_s.OUTPUT_DIR + '学習データ.csv', encoding='cp932', engine='python')
         df_actual_sales = pd.read_csv(self.sp_s.OUTPUT_DIR + '実販売数データ.csv', encoding='cp932', engine='python')
         df_inv = pd.read_csv(self.sp_s.OUTPUT_DIR + '在庫データ(全期間).csv', encoding='cp932', engine='python')
@@ -38,10 +38,10 @@ class SalesPrediction:
         return
 
     def _preprocess(self):
-        self.df_tgt_item = pd.read_csv('./data/Input/tgt_itm_cd/sim/25item.csv', encoding='cp932', engine='python')
+        self.df_tgt_item = pd.read_csv('./data/Input/tgt_itm_cd/sim/24item.csv', encoding='cp932', engine='python')
+        self.df_tgt_item = self.preprc.adjust_0_filled(self.df_tgt_item)
         df_tgt_item_info = self.util.extract_tgt_itm_info(self.sql_cli, self.df_tgt_item['item_cd'].tolist(),
                                                           self.sp_s.TGT_UPPER_DATE)
-        self.df_tgt_item = self.preprc.adjust_0_filled(self.df_tgt_item)
         self.df_tgt_item = pd.merge(self.df_tgt_item, df_tgt_item_info)
 
         df_training_sales_by_chanel = self._fetch_sales_by_item(self.df_tgt_item['item_cd'].tolist(),

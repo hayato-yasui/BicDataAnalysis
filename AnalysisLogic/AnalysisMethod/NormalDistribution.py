@@ -28,6 +28,7 @@ class NormalDistribution:
         # self._create_model
         df_sim_rslt = self._exec_sim(df_training_sales_tested, df_training_avg_std)
         self.util.df_to_csv(df_sim_rslt,self.sp_s.OUTPUT_DIR,'sim結果_単純な正規分布.csv')
+        self.util.df_to_csv(df_training_sales_tested,self.sp_s.OUTPUT_DIR,'正規分布チェック.csv')
 
     def _preprocess(self):
         self.index_li = [c for c in self.df_training_data.columns.values.tolist() if
