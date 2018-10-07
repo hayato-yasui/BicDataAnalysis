@@ -27,10 +27,12 @@ class ChartClient:
         df.plot(kind='pie', y=amount_col, sort_columns=sort_columns)
         # plt.title('円グラフ', size=16, fontproperties=fp)
 
-    @staticmethod
-    def time_series_graph(df, amount_cols_li, figsize=(16, 4), alpha=0.5):
+    def time_series_graph(self,df, amount_cols_li,does_save=False,file_path=None,figsize=(16, 4), alpha=0.5):
         # 時系列カラムをインデックスに指定する必要がある
         df.plot(y=amount_cols_li, figsize=figsize, alpha=alpha)
+        if does_save:
+            self.savefig( os.path.split(file_path)[0]+'/', os.path.split(file_path)[1])
+        self.closefig()
 
     @staticmethod
     def plot_x_y(df, x, y, tittle, needsSave=False, file_path=None):
@@ -40,6 +42,17 @@ class ChartClient:
         if needsSave:
             dir_pair = os.path.split(file_path)
             ChartClient.savefig(dir_pair[0], dir_pair[1])
+
+    def plot_2axis(self,df1,df2, needsSave=False, file_path=None):
+        fig, ax1 = plt.subplots()
+        ax1.plot(df1['売価'],color='red')
+        ax2 = ax1.twinx()  # 2つのプロットを関連付ける
+        ax2.bar(df2.index,df2['販売数'])
+        # plt.show()
+        if needsSave:
+            dir_pair = os.path.split(file_path)
+            self.savefig(dir_pair[0]+'/', dir_pair[1])
+        self.closefig()
 
     @staticmethod
     def plot_axis_is_index(df, needsSave=False, file_path=None):

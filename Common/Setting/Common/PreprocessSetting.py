@@ -44,13 +44,13 @@ class MergeMasterTableSetting(object):
     NECESSARY_COLS = ['店舗名', '都道府県', '営業開始時間', '営業締め時間', 'サービス料金掛け率', '席数', ]
 
     # weather master
-    DIR_WEATHER = './data/Input/master/weather/'
+    DIR_WEATHER = './data/Input/master/weather.csv'
 
     # calender maseter
-    F_PATH_CALENDER = './data/Input/master/calender/calender.csv'
+    F_PATH_CALENDER = './data/Input/master/calender.csv'
 
     # chanel maseter
-    F_PATH_CHANEL = './data/Input/master/chanel/chanel.csv'
+    F_PATH_CHANEL = './data/Input/master/chanel.csv'
 
 
 class ColumnGroup(object):

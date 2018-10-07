@@ -24,6 +24,8 @@ class SQLServerClient:
                 r'PWD='+self.config.PG_MAIN_PASS+';'
                 # r'MARS_Connection= yes'
             )
+            # return pyodbc.connect(
+            #     'DRIVER ={ODBC Driver 13 for SQL Server};SERVER = localhost\CPX-U6IAP7U7ID7\MSSQLSERVER2;DATABASE = Bic_EC;Trusted_Connection = yes ;')
 
         except Exception as e:
             raise e

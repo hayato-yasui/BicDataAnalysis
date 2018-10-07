@@ -1,6 +1,6 @@
 RAKUTEN_SQL_DICT = {
-    "select__sales_by_chanel_and_item": """
-    SELECT TOP 10
+    "select_sales_by_chanel_and_item": """
+    SELECT
         T1.[dtIfBusinessDate] as 日付,
         T1.vcLogisticsCd as store_cd,
         T3.vcOrderGPName as 発注GP,
@@ -21,6 +21,7 @@ RAKUTEN_SQL_DICT = {
             AND [dtIfBusinessDate] IN ({tgt_date})
             AND [vcLogisticsCd] =  '861'
             AND vcSiteCd IN ({chanel_cd})
+            AND [vcItemCd] = '{item_cd}'
     ) AS T1
     INNER JOIN
     (SELECT [vcDepartmentCd]
@@ -28,6 +29,7 @@ RAKUTEN_SQL_DICT = {
            ,[vcItemName]
     FROM [AFSForBiccamera_DataStore].[dbo].[T_INF_Item]
     WHERE  [dtIfBusinessDate]  = '{upper_date}'
+            AND [vcItemCd] = '{item_cd}'
     ) AS T2
     ON T1.[vcItemCd] = T2.[vcItemCd]
     INNER JOIN
@@ -45,6 +47,7 @@ RAKUTEN_SQL_DICT = {
             ,vcItemCd
         FROM [AFSForBiccamera_DataStore].[dbo].[T_INF_AutoOrder]
         WHERE dtIfBusinessDate = '{upper_date}'
+            AND [vcItemCd] = '{item_cd}'
     ) AS T4
     ON  T1.vcLogisticsCd = T4.vcSiteCd
         AND T1.vcItemCd = T4.vcItemCd
@@ -56,7 +59,7 @@ RAKUTEN_SQL_DICT = {
         T1.vcItemCd,
         T2.vcItemName,
         T1.vcLogisticsCd
-    ;
+    
     """,
 
 }

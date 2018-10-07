@@ -259,9 +259,7 @@ class Preprocess:
         for c in df.columns.values:
             if c == 'item_cd':
                 df[c] = df[c].astype(str).str.zfill(13)
-            elif c == 'store_cd':
-                df[c] = df[c].astype(str).str.zfill(3)
-            elif c == 'distro_cd':
+            elif c == 'store_cd' or 'distro_cd' or 'chanel_cd':
                 df[c] = df[c].astype(str).str.zfill(3)
             elif c == 'supplier_cd':
                 df[c] = df[c].astype(str).str.zfill(5)
@@ -313,13 +311,38 @@ class MergeMasterTable:
         return pd.merge(df_src, df_weather, left_on=['都道府県', 'H.集計対象営業年月日'], right_on=['都道府県', '年月日']) \
             .drop('年月日', axis=1)
 
-    def merge_calender(self, df_src, file_path, floor_date=None, top_date=None):
+    def merge_calender(self, df_src, floor_date=None, upper_date=None, adjust_0=None,amout_col=None):
+        file_path = self.mmt_s.F_PATH_CALENDER
         df_calender = pd.read_csv(file_path, encoding='cp932', engine='python')
-        if floor_date is not None and top_date is not None:
-            df_calender = df_calender[df_calender['日付'].between(floor_date, top_date)]
         df_calender['日付'] = pd.to_datetime(df_calender['日付'], errors='coerce')
-        df_calender['翌日が休日'] = df_calender.apply(lambda x: 1 if x['翌日が休日'] > 0 else 0, axis=1)
-        return pd.merge(df_src, df_calender, left_on='H.集計対象営業年月日', right_on='日付').drop('日付', axis=1)
+        if floor_date is not None and upper_date is not None:
+            df_calender = df_calender[df_calender['日付'].between(floor_date, upper_date)]
+        if adjust_0:
+            list_of_dfs = []
+            index_li = df_src.columns.values.tolist()
+            [index_li.remove(c) for c in [amout_col, '日付']]
+            for key, df_item in df_src.groupby(index_li):
+                df_item.reset_index(drop=True,inplace=True)
+                df_dummy = df_calender.copy()
+                for c in index_li:
+                    df_dummy[c] = df_item[:1][c][0]
+                list_of_dfs.append(df_dummy)
+            df_calender = pd.concat(list_of_dfs)
+            df_calender = pd.merge(df_calender, df_src, how='left')
+            df_calender[amout_col] = df_calender[amout_col].fillna(0)
+        return df_calender
+
+    # def merge_calender(self, df_src, floor_date=None, top_date=None):
+    #     file_path = self.mmt_s.F_PATH_CALENDER
+    #     df_calender = pd.read_csv(file_path, encoding='cp932', engine='python')
+    #     df_calender['日付'] = pd.to_datetime(df_calender['日付'], errors='coerce')
+    #     if floor_date is not None and top_date is not None:
+    #         df_calender = df_calender[df_calender['日付'].between(floor_date, top_date)]
+    #
+    #     df = pd.merge(df_calender, df_src, how='left', left_on='日付', right_on='日付')
+    #     df['販売数'] = df['販売数'].fillna(0)
+    #     return df
+    # return pd.merge(df_src, df_calender, how='left', left_on='日付', right_on='日付')
 
     def merge_chanel(self, df_src):
         df_chanel = pd.read_csv(self.folder_path + 'chanel.csv', encoding='cp932', engine='python')

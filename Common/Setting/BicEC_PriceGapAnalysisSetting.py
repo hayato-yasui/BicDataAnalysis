@@ -1,15 +1,10 @@
 import datetime
 
 
-class RakutenPointUPAnalysisSetting(object):
-    OUTPUT_DIR = './data/OUTPUT/' + '楽天_ポイントアップ分析' + '/'
-    TGT_UPPER_DATE = datetime.date(2018, 8, 31)
-    TGT_FLOOR_DATE = datetime.date(2018, 1, 1)
-    CALC_TGT_COL = '販売数'
-    T_TEST_TGT_COL = 'item_cd'
-    T_TEST_DIFF_COL = '5か0のつく日'
-    T_TEST_DIFF_CONDITION = 1
-
+class BicECPriceGapAnalysisSetting(object):
+    OUTPUT_DIR = './data/OUTPUT/' + 'BicEC_PriceGapAnalysis' + '/'
+    TGT_FLOOR_DATE = datetime.date(2018,6,1)
+    TGT_UPPER_DATE = datetime.date(2018,8,31)
 
 
 class PreprocessSetting(object):
